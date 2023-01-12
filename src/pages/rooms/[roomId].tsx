@@ -1,9 +1,9 @@
-import { Session } from "next-auth";
-import {useSession, signOut, signIn} from "next-auth/react";
+import type { Session } from "next-auth";
+import { useSession, signOut, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
-import { useState} from "react";
-import { Message } from "../../server/api/routers/room";
-import {api} from "../../utils/api";
+import { useState } from "react";
+import type { Message } from "../../server/api/routers/room";
+import { api } from "../../utils/api";
 
 function MessageItem({
   message,
@@ -39,49 +39,53 @@ function RoomPage() {
   const router = useRouter();
   const roomId = router.query.roomId as string;
   const { data: session } = useSession();
-
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-    api.room.onSendMessage.useSubscription({roomId}, {
-        onData(message) {
-            setMessages((m) => {
-                return [...m, message];
-            });
-        },
-        onError(err) {
-            console.error('Subscription error:', err);
-        },
-    });
-    api.room.onCloseConnection.useSubscription(undefined, {
-        onData(message) {
-            setMessages((m) => {
-                return [...m, message];
-            });
-        },
-        onError(err) {
-            console.error('Subscription error:', err);
-        },
-    });
+  api.room.onSendMessage.useSubscription(
+    { roomId },
+    {
+      onData(message) {
+        setMessages((m) => {
+          return [...m, message];
+        });
+      },
+      onError(err) {
+        console.error("Subscription error:", err);
+      },
+    }
+  );
+  api.room.onCloseConnection.useSubscription(undefined, {
+    onData(message) {
+      setMessages((m) => {
+        return [...m, message];
+      });
+    },
+    onError(err) {
+      console.error("Subscription error:", err);
+    },
+  });
 
   const sendMessageMutation = api.room.sendMessage.useMutation();
   const closeConnectionMutation = api.room.closeConnection.useMutation();
 
   const leaveChat = () => {
-      closeConnectionMutation.mutate({ roomId })
-      signIn();
+    closeConnectionMutation.mutate({ roomId });
+    signIn();
   };
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex h-screen flex-col">
       <div className="flex-1">
         <ul className="flex flex-col p-4">
           {messages.map((m) => {
-            return <MessageItem key={m.id} message={m} session={session || null} />;
+            return (
+              <MessageItem key={m.id} message={m} session={session || null} />
+            );
           })}
         </ul>
       </div>
-        <button className={"w-5/6 bg-blue-900"} onClick={() => leaveChat()}>
-            Leave chat
-        </button>
+      <button className={"w-5/6 bg-blue-900"} onClick={() => leaveChat()}>
+        Leave chat
+      </button>
       <form
         className="flex"
         onSubmit={(e) => {
@@ -96,13 +100,13 @@ function RoomPage() {
         }}
       >
         <textarea
-          className="black p-2.5 w-full text-gray-700 bg-gray-50 rounded-md border border-gray-700"
+          className="black w-full rounded-md border border-gray-700 bg-gray-50 p-2.5 text-gray-700"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="What do you want to say"
         />
 
-        <button className="flex-1 text-white bg-gray-900 p-2.5" type="submit">
+        <button className="flex-1 bg-gray-900 p-2.5 text-white" type="submit">
           Send message
         </button>
       </form>

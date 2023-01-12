@@ -19,17 +19,7 @@ const messageSchema = z.object({
         name: z.string(),
     }),
 });
-const connectionSchema = z.object({
-    id: z.string(),
-    roomId: z.string(),
-    sentAt: z.date(),
-    sender: z.object({
-        name: z.string().optional(),
-    }),
-});
-
 export type Message = z.TypeOf<typeof messageSchema>;
-export type Connection = z.TypeOf<typeof connectionSchema>;
 export enum Events {
     SEND_MESSAGE = "SEND_MESSAGE",
     CLOSE_CONNECTION = "CLOSE_CONNECTION",
