@@ -1,14 +1,13 @@
-import { httpBatchLink } from '@trpc/client/links/httpBatchLink';
-import { loggerLink } from '@trpc/client/links/loggerLink';
-import { wsLink, createWSClient } from '@trpc/client/links/wsLink';
-import { createTRPCNext } from '@trpc/next';
-import type { inferProcedureOutput } from '@trpc/server';
-import type { AppRouter } from '../server/api/root';
-import superjson from 'superjson';
+import { httpBatchLink } from "@trpc/client/links/httpBatchLink";
+import { loggerLink } from "@trpc/client/links/loggerLink";
+import { wsLink, createWSClient } from "@trpc/client/links/wsLink";
+import { createTRPCNext } from "@trpc/next";
+import type { inferProcedureOutput } from "@trpc/server";
+import type { AppRouter } from "../server/api/root";
+import superjson from "superjson";
 
 // ℹ️ Type-only import:
 // https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-8.html#type-only-imports-and-export
-
 
 const getBaseUrl = () => {
   if (typeof window !== "undefined") {
@@ -57,9 +56,9 @@ export const api = createTRPCNext<AppRouter>({
         // adds pretty logs to your console in development and logs errors in production
         loggerLink({
           enabled: (opts) =>
-              (process.env.NODE_ENV === 'development' &&
-                  typeof window !== 'undefined') ||
-              (opts.direction === 'down' && opts.result instanceof Error),
+            (process.env.NODE_ENV === "development" &&
+              typeof window !== "undefined") ||
+            (opts.direction === "down" && opts.result instanceof Error),
         }),
         getEndingLink(),
       ],
@@ -70,7 +69,7 @@ export const api = createTRPCNext<AppRouter>({
       /**
        * @link https://react-query.tanstack.com/reference/QueryClient
        */
-      queryClientConfig: { defaultOptions: { queries: { staleTime: 60 } } },
+      // queryClientConfig: { defaultOptions: { queries: { staleTime: 1 } } },
     };
   },
   /**
@@ -85,5 +84,5 @@ export const api = createTRPCNext<AppRouter>({
  * @example type HelloOutput = inferQueryOutput<'hello'>
  */
 export type inferQueryOutput<
-    TRouteKey extends keyof AppRouter['_def']['queries'],
-    > = inferProcedureOutput<AppRouter['_def']['queries'][TRouteKey]>;
+  TRouteKey extends keyof AppRouter["_def"]["queries"]
+> = inferProcedureOutput<AppRouter["_def"]["queries"][TRouteKey]>;

@@ -1,26 +1,27 @@
 import { type NextPage } from "next";
 import Head from "next/head";
-import { customAlphabet } from "nanoid";
-import {useRouter} from "next/router";
-import {signIn, useSession} from "next-auth/react";
-import {useEffect} from "react";
-
-const nanoid = customAlphabet("abcdefghijklmnopqrstuvqxyz0123456789", 4);
+import { useRouter } from "next/router";
+import { signIn, useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { api } from "../utils/api";
 
 const Home: NextPage = () => {
   const router = useRouter();
-  const { data: session } = useSession()
+  const { data: session } = useSession();
+  const usersQuery = api.user.findMany.useQuery();
 
   const createRoom = () => {
-        const roomId = nanoid();
-        router.push(`/rooms/${roomId}`).catch(() => console.log("err"));
-  }
+    const user = usersQuery?.data?.find(
+      (user) => user.name === session?.user?.name
+    );
+    router.push(`/rooms/${user.id}`).catch(() => console.log("err"));
+  };
   useEffect(() => {
-      console.log("user", session?.user?.name)
-      if(session?.user?.name) {
-          createRoom();
-      }
-  }, [session])
+    console.log("user", session?.user?.name);
+    if (session?.user?.name) {
+      createRoom();
+    }
+  }, [session]);
   return (
     <>
       <Head>

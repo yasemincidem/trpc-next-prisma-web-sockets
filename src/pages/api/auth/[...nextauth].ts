@@ -23,16 +23,37 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        username: { label: "Username", type: "text", placeholder: "username" },
-        password: { label: "Password", type: "password" },
+        username: {
+          label: "Username",
+          type: "text",
+          placeholder: "username is required",
+        },
+        email: {
+          label: "Email",
+          type: "text",
+          placeholder: "email is required",
+        },
       },
       async authorize(credentials, _req) {
-        const dbUser = await prisma.user.findUnique({
-          where: {
-            email: credentials?.username,
-          },
+        const { nanoid } = await import("nanoid");
+        const user = await prisma.user.findFirst({
+          where: { name: credentials?.username, email: credentials?.email },
         });
-        return dbUser;
+        if (!user) {
+          if (credentials?.username && credentials?.email) {
+            return await prisma.user.create({
+              data: {
+                id: nanoid(),
+                name: credentials?.username,
+                email: credentials?.email,
+              },
+            });
+          } else {
+            return false;
+          }
+        } else {
+          return user;
+        }
       },
     }),
   ],
