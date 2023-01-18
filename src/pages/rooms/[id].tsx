@@ -18,7 +18,7 @@ function MessageItem({
     "mb-4 text-md w-7/12 p-4 text-gray-700 border border-gray-700 rounded-md";
 
   const liStyles =
-    message.sender.name === session?.user?.name
+    message.user.name === session?.user?.name
       ? baseStyles
       : baseStyles.concat(" self-end bg-gray-700 text-white");
 
@@ -26,13 +26,13 @@ function MessageItem({
     <li className={liStyles}>
       <div className="flex">
         <time>
-          {message.sentAt.toLocaleTimeString("en-AU", {
+          {message.createdAt.toLocaleTimeString("en-AU", {
             timeStyle: "short",
           })}{" "}
-          - {message.sender.name}
+          - {message.user.name}
         </time>
       </div>
-      {message.message}
+      {message.text}
     </li>
   );
 }
@@ -40,21 +40,32 @@ function MessageItem({
 function RoomPage() {
   const router = useRouter();
   const userId = router.query.id as string;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  const utils = api.useContext();
   const { data: session } = useSession();
   const [message, setMessage] = useState("");
-  const [roomId, setRoom] = useState("");
+  const [roomId, setRoomId] = useState("");
+  const [isRoomChanged, setIsRoomChanged] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const roomsQuery = api.room.findMany.useQuery();
   const roomQuery = api.room.findOne.useQuery(roomId);
+  const messageQuery = api.message.findMany.useQuery({ roomId });
+
+  useEffect(() => {
+    setMessages(messageQuery.data);
+  }, [isRoomChanged, messageQuery.data]);
 
   api.room.onSendMessage.useSubscription(undefined, {
     onData(message) {
-      const user = message.user.find((u) => u.id === userId);
+      const user = message.users.find((u) => u.id === userId);
       if (user.roomId === message.roomId) {
         setMessages((m) => {
-          return [...m, message];
+          return [
+            ...m,
+            {
+              createdAt: new Date(),
+              user: { name: message.sender.name },
+              text: message.message,
+            },
+          ];
         });
       }
     },
@@ -62,48 +73,22 @@ function RoomPage() {
       console.error("Subscription error:", err);
     },
   });
-  api.room.onEnterRoom.useSubscription(undefined, {
-    onData(message) {
-      if (userId === message.userId) {
-        setRoom(message.roomId);
-      }
-    },
-    onError(err) {
-      console.error("Subscription error:", err);
-    },
-  });
+  const addRoom = api.user.addRoom.useMutation();
+  const sendMessageMutation = api.room.sendMessage.useMutation();
+  const addMessage = api.message.addMessage.useMutation();
 
-  const addRoom = api.user.addRoom.useMutation({
-    onSuccess: () => {
-      utils.user.findMany.invalidate();
-    },
-  });
-  const sendMessageMutation = api.room.sendMessage.useMutation({
-    onSuccess: () => {
-      utils.user.findMany.invalidate();
-    },
-  });
-  const closeConnectionMutation = api.room.closeConnection.useMutation();
-
-  const leaveChat = () => {
-    closeConnectionMutation.mutate({ roomId });
-    signIn();
-  };
   return (
     <div className="grid md:grid-cols-5">
       <div className="flex h-screen flex-col border-2 md:col-span-4">
-        <div className="flex-1">
+        <div className="flex-1 overflow-y-scroll">
           <ul className="flex flex-col p-4">
-            {messages.map((m) => {
+            {messages?.map((m) => {
               return (
                 <MessageItem key={m.id} message={m} session={session || null} />
               );
             })}
           </ul>
         </div>
-        <button className={"w-5/6 bg-blue-400"} onClick={() => leaveChat()}>
-          Leave chat
-        </button>
         <form
           className="flex"
           onSubmit={(e) => {
@@ -114,7 +99,7 @@ function RoomPage() {
               userId,
               message,
             });
-
+            addMessage.mutate({ userId, text: message, roomId });
             setMessage("");
           }}
         >
@@ -141,14 +126,9 @@ function RoomPage() {
                 backgroundColor: room.id === roomId ? "red" : "white",
               }}
               onClick={() => {
+                setRoomId(room.id);
                 addRoom.mutate({ userId, roomId: room.id });
-                sendMessageMutation.mutate({
-                  roomId: room.id,
-                  userId,
-                  message: "new group",
-                });
-                setRoom(room.id);
-                setMessages([]);
+                setIsRoomChanged(!isRoomChanged);
               }}
             >
               <span className={"ml-1 mt-1 text-sm font-medium"}>

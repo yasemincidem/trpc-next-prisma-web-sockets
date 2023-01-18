@@ -10,9 +10,6 @@ export const sendMessageSchema = z.object({
   message: z.string(),
   userId: z.string(),
 });
-export const closeConnectionSchema = z.object({
-  roomId: z.string(),
-});
 const messageSchema = z.object({
   id: z.string(),
   message: z.string(),
@@ -22,17 +19,12 @@ const messageSchema = z.object({
   sender: z.object({
     name: z.string(),
   }),
+  users: z.array(z.string()),
 });
 export type Message = z.TypeOf<typeof messageSchema>;
 export enum Events {
   SEND_MESSAGE = "SEND_MESSAGE",
-  CLOSE_CONNECTION = "CLOSE_CONNECTION",
-  ENTER_ROOM = "ENTER_ROOM",
 }
-
-export const messageSubSchema = z.object({
-  roomId: z.string(),
-});
 export const ee = new EventEmitter();
 
 export const roomRouter = createTRPCRouter({
@@ -80,60 +72,12 @@ export const roomRouter = createTRPCRouter({
       include: { users: true },
     });
   }),
-  closeConnection: publicProcedure
-    .input(closeConnectionSchema)
-    .mutation(({ ctx, input }) => {
-      const message: Message = {
-        id: randomUUID(),
-        ...input,
-        message: `${ctx.session?.user?.name ?? ""} left the room`,
-        sentAt: new Date(),
-        sender: {
-          name: ctx.session?.user?.name || "unknown",
-        },
-      };
-
-      ee.emit(Events.CLOSE_CONNECTION, message);
-      return message;
-    }),
-
-  onCloseConnection: publicProcedure.subscription(() => {
-    return observable<Message>((emit) => {
-      const onConnection = (data: any) => {
-        // emit data to client
-        emit.next(data);
-      };
-      // trigger `onConnection()` when `add` is triggered in our event emitter
-      ee.on(Events.CLOSE_CONNECTION, onConnection);
-      // unsubscribe function when client disconnects or stops subscribing
-      return () => {
-        ee.off(Events.CLOSE_CONNECTION, onConnection);
-      };
-    });
-  }),
-  onEnterRoom: publicProcedure.subscription(() => {
-    return observable<Message>((emit) => {
-      const onConnection = (data: any) => {
-        // emit data to client
-        console.log("sdasa", data);
-        emit.next(data);
-      };
-      // trigger `onConnection()` when `add` is triggered in our event emitter
-      ee.on(Events.ENTER_ROOM, onConnection);
-      // unsubscribe function when client disconnects or stops subscribing
-      return () => {
-        ee.off(Events.ENTER_ROOM, onConnection);
-      };
-    });
-  }),
-
   onSendMessage: publicProcedure.subscription(() => {
     return observable<Message>((emit) => {
       const onMessage = async (data: Message) => {
         // emit data to client
-        const user = await prisma.user.findMany();
-        console.log("listener event", user);
-        data.user = user;
+        const users = await prisma.user.findMany();
+        data.users = users;
         emit.next(data);
       };
       // trigger `onMessage()` when `add` is triggered in our event emitter

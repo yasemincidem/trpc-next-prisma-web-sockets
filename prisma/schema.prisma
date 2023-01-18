@@ -15,12 +15,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Example {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // Necessary for Next auth
 model Account {
   id                String  @id @default(cuid())
@@ -50,19 +44,32 @@ model Session {
 
 model User {
   id       String    @id @default(cuid())
-  roomId   String?    @unique @default(cuid())
+  roomId   String?   @unique @default(cuid())
   name     String?   @unique
   email    String?   @unique
   image    String?
+  room     Room?     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   accounts Account[]
   sessions Session[]
-  room   Room?    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  messages Message[]
 }
 
 model Room {
-  id     String  @id @default(cuid())
-  name   String? @unique
+  id       String    @id @default(cuid())
+  name     String?   @unique
   users    User[]
+  messages Message[]
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  userId    String?  @unique @default(cuid())
+  roomId    String?  @unique @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  text      String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room      Room?    @relation(fields: [roomId], references: [id], onDelete: Cascade)
 }
 
 model VerificationToken {
