@@ -24,6 +24,7 @@ const messageSchema = z.object({
 export type Message = z.TypeOf<typeof messageSchema>;
 export enum Events {
   SEND_MESSAGE = "SEND_MESSAGE",
+  ENTER_ROOM = "ENTER_ROOM",
 }
 export const ee = new EventEmitter();
 
@@ -42,6 +43,14 @@ export const roomRouter = createTRPCRouter({
 
       ee.emit(Events.SEND_MESSAGE, message);
       return message;
+    }),
+  enterRoom: publicProcedure
+    .input(sendMessageSchema)
+    .mutation(async ({ input }) => {
+      const users = await prisma.user.findMany({
+        where: { roomId: input.roomId },
+      });
+      ee.emit(Events.ENTER_ROOM, users);
     }),
   addRooms: publicProcedure
     .input(
@@ -64,13 +73,15 @@ export const roomRouter = createTRPCRouter({
       });
     }),
   findMany: publicProcedure.query(async () => {
-    return await prisma.room.findMany();
+    return await prisma.room.findMany({ include: { users: true } });
   }),
   findOne: publicProcedure.input(z.string()).query(async ({ input }) => {
-    return await prisma.room.findUnique({
+    const room = await prisma.room.findUnique({
       where: { id: input },
       include: { users: true },
     });
+    console.log("backend room", room);
+    return room;
   }),
   onSendMessage: publicProcedure.subscription(() => {
     return observable<Message>((emit) => {
@@ -85,6 +96,20 @@ export const roomRouter = createTRPCRouter({
       // unsubscribe function when client disconnects or stops subscribing
       return () => {
         ee.off(Events.SEND_MESSAGE, onMessage);
+      };
+    });
+  }),
+  onEnterRoom: publicProcedure.subscription(() => {
+    return observable((emit) => {
+      const onMessage = async (data: any) => {
+        // emit data to client
+        emit.next(data);
+      };
+      // trigger `onMessage()` when `add` is triggered in our event emitter
+      ee.on(Events.ENTER_ROOM, onMessage);
+      // unsubscribe function when client disconnects or stops subscribing
+      return () => {
+        ee.off(Events.ENTER_ROOM, onMessage);
       };
     });
   }),
