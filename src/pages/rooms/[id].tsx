@@ -2,7 +2,7 @@ import type { Session } from "next-auth";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { useEffect, useState, useRef } from "react";
-import type { Message } from "../../server/api/routers/room";
+import type { MessageType, UserType } from "../../server/api/routers/room";
 import { api } from "../../utils/api";
 import avatarImage from "../../../public/avatar.png";
 import Image from "next/image";
@@ -11,13 +11,13 @@ function MessageItem({
   message,
   session,
 }: {
-  message: Message;
+  message: MessageType;
   session: Session | null;
 }) {
   return (
-    <li
+    <div
       className={`text-md mb-4 w-7/12 rounded-md p-4 text-gray-700 ${
-        message.user.name === session?.user?.name
+        message.userName === session?.user?.name
           ? "self-end bg-purple-200 text-black"
           : "bg-purple-900 text-white"
       }`}
@@ -27,11 +27,11 @@ function MessageItem({
           {message.createdAt.toLocaleTimeString("en-AU", {
             timeStyle: "short",
           })}{" "}
-          - {message.user.name}
+          - {message.userName}
         </time>
       </div>
       {message.text}
-    </li>
+    </div>
   );
 }
 
@@ -42,11 +42,10 @@ function RoomPage() {
   const [message, setMessage] = useState("");
   const [roomId, setRoomId] = useState("");
   const [isRoomChanged, setIsRoomChanged] = useState(false);
-  const [users, setUsers] = useState([]);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const messageRef = useRef(null);
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [messages, setMessages] = useState<MessageType[]>([]);
+  const messageRef = useRef<HTMLDivElement>(null);
   const roomsQuery = api.room.findMany.useQuery();
-  const roomQuery = api.room.findOne.useQuery(roomId);
   const messageQuery = api.message.findMany.useQuery({ roomId });
   const addRoom = api.user.addRoom.useMutation();
   const sendMessageMutation = api.room.sendMessage.useMutation();
@@ -54,11 +53,20 @@ function RoomPage() {
   const enterRoom = api.room.enterRoom.useMutation();
 
   useEffect(() => {
-    setRoomId(roomsQuery?.data[0].id);
+    // TODO: this is general room's id.
+    //  It will be fetched from server in the future
+    const roomId = "4356XHrQwPGMizAz5CL13";
+    setRoomId(roomId);
+    if (roomId && userId) {
+      addRoom.mutate({ userId, roomId: roomId });
+    }
   }, []);
 
   useEffect(() => {
-    setMessages(messageQuery.data);
+    if (messageQuery.data) {
+      setMessages(messageQuery.data);
+      enterRoom.mutate({ roomId });
+    }
   }, [isRoomChanged, messageQuery.data]);
 
   useEffect(() => {
@@ -72,16 +80,15 @@ function RoomPage() {
   }, [messages]);
 
   api.room.onSendMessage.useSubscription(undefined, {
-    onData(message) {
-      const user = message.users.find((u) => u.id === userId);
-      if (user.roomId === message.roomId) {
+    onData(data) {
+      const user = data.users.find((u) => u.id === userId);
+      if (user?.roomId === data.message.roomId) {
         setMessages((m) => {
           return [
             ...m,
             {
+              ...data.message,
               createdAt: new Date(),
-              user: { name: message.sender.name },
-              text: message.message,
             },
           ];
         });
@@ -93,8 +100,8 @@ function RoomPage() {
   });
 
   api.room.onEnterRoom.useSubscription(undefined, {
-    onData(room) {
-      setUsers(room.users);
+    onData(users) {
+      setUsers(users);
     },
     onError(err) {
       console.error("Subscription error:", err);
@@ -112,7 +119,6 @@ function RoomPage() {
                 room.id === roomId ? "bg-purple-200" : "white"
               }`}
               onClick={() => {
-                enterRoom.mutate({ roomId: room.id });
                 setRoomId(room.id);
                 addRoom.mutate({ userId, roomId: room.id });
                 setIsRoomChanged(!isRoomChanged);
@@ -125,13 +131,17 @@ function RoomPage() {
       </div>
       <div className="flex h-screen flex-col border-l-2 border-r-2 md:col-span-3">
         <div className="flex-1 overflow-y-scroll">
-          <ul className="flex flex-col p-4" ref={messageRef}>
-            {messages?.map((m) => {
+          <div className="flex flex-col p-4" ref={messageRef}>
+            {messages?.map((m, index) => {
               return (
-                <MessageItem key={m.id} message={m} session={session || null} />
+                <MessageItem
+                  key={index}
+                  message={m}
+                  session={session || null}
+                />
               );
             })}
-          </ul>
+          </div>
         </div>
         <div className={"flex flex-row"}>
           <input
@@ -144,9 +154,14 @@ function RoomPage() {
                 sendMessageMutation.mutate({
                   roomId,
                   userId,
-                  message,
+                  text: message,
                 });
-                addMessage.mutate({ userId, text: message, roomId });
+                addMessage.mutate({
+                  userId,
+                  userName: session?.user?.name ?? "unknown",
+                  text: message,
+                  roomId,
+                });
                 setMessage("");
               }
             }}
@@ -157,7 +172,7 @@ function RoomPage() {
       <div className="m-3 flex flex-col">
         <div className="flex flex-col">
           <span className={"text ml-1 mb-3 text-sm font-bold"}>People</span>
-          {roomQuery?.data?.users.map((user) => {
+          {users?.map((user) => {
             return (
               <div
                 key={user.id}

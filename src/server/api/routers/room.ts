@@ -3,25 +3,32 @@ import { randomUUID } from "crypto";
 import { observable } from "@trpc/server/observable";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { EventEmitter } from "events";
-import { prisma } from "../../db";
+import { prisma, Prisma } from "../../db";
 
-export const sendMessageSchema = z.object({
-  roomId: z.string(),
-  message: z.string(),
-  userId: z.string(),
+const message = Prisma.validator<Prisma.MessageArgs>()({
+  select: {
+    id: true,
+    text: true,
+    createdAt: true,
+    userName: true,
+    userId: true,
+    roomId: true,
+  },
 });
-const messageSchema = z.object({
-  id: z.string(),
-  message: z.string(),
-  roomId: z.string(),
-  userId: z.string(),
-  sentAt: z.date(),
-  sender: z.object({
-    name: z.string(),
-  }),
-  users: z.array(z.string()),
+const user = Prisma.validator<Prisma.UserArgs>()({
+  select: {
+    id: true,
+    roomId: true,
+    name: true,
+  },
 });
-export type Message = z.TypeOf<typeof messageSchema>;
+export type MessageType = Prisma.MessageGetPayload<typeof message>;
+export type UserType = Prisma.UserGetPayload<typeof user>;
+
+type MessageOutputType = {
+  message: MessageType;
+  users: UserType[];
+};
 export enum Events {
   SEND_MESSAGE = "SEND_MESSAGE",
   ENTER_ROOM = "ENTER_ROOM",
@@ -30,47 +37,23 @@ export const ee = new EventEmitter();
 
 export const roomRouter = createTRPCRouter({
   sendMessage: publicProcedure
-    .input(sendMessageSchema)
+    .input(
+      z.object({ text: z.string(), userId: z.string(), roomId: z.string() })
+    )
     .mutation(({ ctx, input }) => {
-      const message: Message = {
+      const message: MessageType = {
         id: randomUUID(),
+        createdAt: new Date(),
+        userName: ctx.session?.user?.name || "unknown",
         ...input,
-        sentAt: new Date(),
-        sender: {
-          name: ctx.session?.user?.name || "unknown",
-        },
       };
-
       ee.emit(Events.SEND_MESSAGE, message);
       return message;
     }),
   enterRoom: publicProcedure
-    .input(sendMessageSchema)
-    .mutation(async ({ input }) => {
-      const users = await prisma.user.findMany({
-        where: { roomId: input.roomId },
-      });
-      ee.emit(Events.ENTER_ROOM, users);
-    }),
-  addRooms: publicProcedure
-    .input(
-      z.object({ roomId: z.string(), name: z.string(), userId: z.string() })
-    )
-    .mutation(async ({ input }) => {
-      console.log("input new", input);
-      await prisma.room.deleteMany({
-        where: {
-          userId: input.userId,
-        },
-      });
-      return await prisma.room.create({
-        data: {
-          id: Math.random().toString(),
-          name: input.name,
-          userId: input.userId,
-          roomId: input.roomId,
-        },
-      });
+    .input(z.object({ roomId: z.string() }))
+    .mutation(({ input }) => {
+      ee.emit(Events.ENTER_ROOM, input);
     }),
   findMany: publicProcedure.query(async () => {
     return await prisma.room.findMany({ include: { users: true } });
@@ -80,35 +63,36 @@ export const roomRouter = createTRPCRouter({
       where: { id: input },
       include: { users: true },
     });
-    console.log("backend room", room);
     return room;
   }),
   onSendMessage: publicProcedure.subscription(() => {
-    return observable<Message>((emit) => {
-      const onMessage = async (data: Message) => {
-        // emit data to client
+    return observable<MessageOutputType>((emit) => {
+      const onMessage = async (message: MessageType) => {
         const users = await prisma.user.findMany();
-        data.users = users;
-        emit.next(data);
+        // emit data to client
+        emit.next({ message, users });
       };
-      // trigger `onMessage()` when `add` is triggered in our event emitter
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       ee.on(Events.SEND_MESSAGE, onMessage);
-      // unsubscribe function when client disconnects or stops subscribing
       return () => {
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         ee.off(Events.SEND_MESSAGE, onMessage);
       };
     });
   }),
   onEnterRoom: publicProcedure.subscription(() => {
-    return observable((emit) => {
-      const onMessage = async (data: any) => {
+    return observable<UserType[]>((emit) => {
+      const onMessage = async (data: { roomId: string }) => {
+        const users = await prisma.user.findMany({
+          where: { roomId: data.roomId },
+        });
         // emit data to client
-        emit.next(data);
+        emit.next(users);
       };
-      // trigger `onMessage()` when `add` is triggered in our event emitter
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       ee.on(Events.ENTER_ROOM, onMessage);
-      // unsubscribe function when client disconnects or stops subscribing
       return () => {
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         ee.off(Events.ENTER_ROOM, onMessage);
       };
     });
