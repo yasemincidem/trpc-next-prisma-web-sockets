@@ -1,28 +1,80 @@
-# Create T3 App
+# Prisma + tRPC + WebSockets
 
-This is a [T3 Stack](https://create.t3.gg/) project bootstrapped with `create-t3-app`.
+Try demo
+![example](./public/test.gif)
 
-## What's next? How do I make an app with this?
+## Features
 
-We try to keep this project as simple as possible, so you can start with just the scaffolding we set up for you, and add additional things later when they become necessary.
+- 🧙‍♂️ E2E type safety with [tRPC](https://trpc.io)
+- ⚡ Full-stack React with Next.js
+- ⚡ WebSockets / Subscription support
+- ⚡ Database with Prisma
+- 🔐 Authorization using [next-auth](https://next-auth.js.org/)
+- ⚙️ VSCode extensions
+- 🎨 ESLint + Prettier
+- 💚 CI setup using GitHub Actions:
+    - ✅ E2E testing with [Playwright](https://playwright.dev/)
+    - ✅ Linting
 
-If you are not familiar with the different technologies used in this project, please refer to the respective docs. If you still are in the wind, please join our [Discord](https://t3.gg/discord) and ask for help.
+## Setup
 
-- [Next.js](https://nextjs.org)
-- [NextAuth.js](https://next-auth.js.org)
-- [Prisma](https://prisma.io)
-- [Tailwind CSS](https://tailwindcss.com)
-- [tRPC](https://trpc.io)
+```bash
+yarn create next-app --example https://github.com/trpc/trpc --example-path examples/next-prisma-starter-websockets trpc-prisma-starter-websockets
+cd trpc-prisma-starter-websockets
+yarn
+yarn dx
+```
 
-## Learn More
+## Deployment
 
-To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:
+### Using [Render](https://render.com/)
 
-- [Documentation](https://create.t3.gg/)
-- [Learn the T3 Stack](https://create.t3.gg/en/faq#what-learning-resources-are-currently-available) — Check out these awesome tutorials
+The project contains a [`render.yaml`](./render.yaml) [_"Blueprint"_](https://render.com/docs/blueprint-spec) which makes the project easily deployable on [Render](https://render.com/).
 
-You can check out the [create-t3-app GitHub repository](https://github.com/t3-oss/create-t3-app) — your feedback and contributions are welcome!
+The database is setup with a `starter` plan, but you can use a free plan for 90 days.
 
-## How do I deploy this?
+Go to [dashboard.render.com/blueprints](https://dashboard.render.com/blueprints) and connect to this Blueprint and see how the app and database automatically gets deployed.
 
-Follow our deployment guides for [Vercel](https://create.t3.gg/en/deployment/vercel), [Netlify](https://create.t3.gg/en/deployment/netlify) and [Docker](https://create.t3.gg/en/deployment/docker) for more information.
+You will either need to create an environment group called `trpc-websockets` with environment variables or remove that from `render.yaml` in favor of manual environment variables that overrides the ones in `/.env`.
+
+## Files of note
+
+<table>
+  <thead>
+    <tr>
+      <th>Path</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="./prisma/schema.prisma"><code>./prisma/schema.prisma</code></a></td>
+      <td>Prisma schema</td>
+    </tr>
+    <tr>
+      <td><a href="./src/api/trpc/[trpc].tsx"><code>./src/api/trpc/[trpc].tsx</code></a></td>
+      <td>tRPC response handler</td>
+    </tr>
+    <tr>
+      <td><a href="./src/server/routers"><code>./src/server/routers</code></a></td>
+      <td>Your app's different tRPC-routers</td>
+    </tr>
+  </tbody>
+</table>
+
+## Commands
+
+```bash
+pnpm build      # runs `prisma generate` + `prisma migrate` + `next build`
+pnpm db-nuke    # resets local db
+pnpm dev        # starts next.js + WebSocket server
+pnpm dx         # starts postgres db + runs migrations + seeds + starts next.js
+pnpm test-dev   # runs e2e tests on dev
+pnpm test-start # runs e2e tests on `next start` - build required before
+pnpm test:unit  # runs normal jest unit tests
+pnpm test:e2e   # runs e2e tests
+```
+
+---
+
+Created by [@alexdotjs](https://twitter.com/alexdotjs).
