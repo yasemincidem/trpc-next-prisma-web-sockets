@@ -74,7 +74,4 @@ pnpm test-start # runs e2e tests on `next start` - build required before
 pnpm test:unit  # runs normal jest unit tests
 pnpm test:e2e   # runs e2e tests
 ```
-
 ---
-
-Created by [@alexdotjs](https://twitter.com/alexdotjs).
